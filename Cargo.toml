@@ -1,0 +1,27 @@
+[package]
+name = "toduit"
+version = "0.1.0"
+authors = ["Erik Craddock <erik@erikvancraddock.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "toduitl"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "toduit"
+path = "src/main.rs"
+
+[dependencies]
+structopt = { version = "0.3", default-features = false }
+config = { version = "0.9" }
+dirs = "2.0"
+chrono = "0.4"
+serde = { version = "^1.0.60", features = ["derive"] }
+serde_derive = "1.0.104"
+serde_yaml = "0.8.11"
+pulldown-cmark = { version = "0.7.0" }
+uuid = { version = "0.4", features = ["serde", "v4"] }
+
