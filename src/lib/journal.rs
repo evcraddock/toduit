@@ -65,10 +65,12 @@ impl Journal {
             .open(&self.journal_path)
             .expect("could not append to journal");
 
-        let link = format!("../../../{}", task.path);
-        journalfile
-            .write_all(format!("* [{}]({})\n", task.task_name, link).as_bytes())
-            .expect("could not write to journal");
+        if !task.exclude_from_journal {
+            let link = format!("../../../{}", task.path);
+            journalfile
+                .write_all(format!("* [{}]({})\n", task.task_name, link).as_bytes())
+                .expect("could not write to journal");
+        }
     }
 
     pub fn add_tasks_to_journal(&self, tasks: Vec<Task>) {
@@ -82,10 +84,12 @@ impl Journal {
             .expect("could not write to journal");
 
         for task in tasks {
-            let link = format!("../../../{}", task.path);
-            journalfile
-                .write_all(format!("* [{}]({})\n", task.task_name, link).as_bytes())
-                .expect("could not write to journal");
+            if !task.exclude_from_journal {
+                let link = format!("../../../{}", task.path);
+                journalfile
+                    .write_all(format!("* [{}]({})\n", task.task_name, link).as_bytes())
+                    .expect("could not write to journal");
+            }
         }
 
         journalfile.sync_data().expect("could not sync data");

@@ -106,6 +106,7 @@ fn main() {
                 remove_from_lists(&settings.get_setting("root-folder"), &task_name, &list_name);
 
                 let journalfolder = settings.get_journal_folder_by_date(&Local::now()).unwrap();
+                // TODO add ability  to add customer header and subheader 
                 let journal = Journal::new("Journal", "My Thoughts Today", &journalfolder);
 
                 if list_name == "Today" {
