@@ -45,10 +45,7 @@ enum Action {
         #[structopt(short = "y", long = "year", default_value = "")]
         year: String,
     },
-    AddJournal {
-        #[structopt(short = "y", long = "year", default_value = "")]
-        year: String,
-    },
+    AddJournal, 
     Unlist {
         task_name: String,
 
@@ -116,17 +113,17 @@ fn main() {
                 println!("Could not add the item to the list");
             }
         }
-        Action::AddJournal { year } => {
-            let projectfolder = settings.get_project_folder_by_year(&get_project_year(&year));
+        Action::AddJournal => {
             let journalfolder = settings.get_journal_folder_by_date(&Local::now()).unwrap();
             let journal = Journal::new("Journal", "My Thoughts Today", &journalfolder);
 
             journal.create().expect("could not create journal");
 
             let tasks = get_tasks(
-                &format!("{}/Today", settings.get_setting("root-folder")),
-                &projectfolder,
+                 &format!("{}/Today", settings.get_setting("root-folder")),
+                 &settings.get_setting("root-folder"),
             );
+
             journal.add_tasks_to_journal(tasks);
         }
         Action::Unlist {

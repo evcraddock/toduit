@@ -90,7 +90,7 @@ impl Task {
         let ps: Vec<Event> = parser.collect();
         for p in &ps {
             if let Event::Start(Tag::Link(_, dest, _)) = p {
-                ymllink = dest.replace("../Projects", &taskfolder).replace("%20", " ");
+                ymllink = dest.replace("..", &taskfolder).replace("%20", " ");
             }
         }
 
