@@ -13,7 +13,7 @@ use crate::task::Task;
 pub struct Journal {
     title: String,
     subheader: String,
-    journal_path: String,
+    pub journal_path: String,
     pub created: DateTime<Local>,
 }
 
@@ -36,6 +36,28 @@ impl Journal {
         }
     }
 
+    pub fn get(date: DateTime<Local>, journal_folder: &str) -> Result<Journal> {
+        let strmonth = date.format("%m - %B");
+        let file_path = format!(
+            "{}/{}/{}/{:02}-{:02}-{} Journal.md",
+            journal_folder,
+            date.year(),
+            strmonth,
+            date.month(),
+            date.day(),
+            date.year()
+        );
+
+        let new_journal = Journal {
+            title: String::new(),
+            subheader: String::new(),
+            created: date,
+            journal_path: file_path,
+        };
+
+        Ok(new_journal)
+    }
+
     pub fn create(&self) -> Result<()> {
         let mut journalfile = File::create(&self.journal_path)?;
 
@@ -53,6 +75,24 @@ impl Journal {
 
         journalfile.sync_data()?;
         Ok(())
+    }
+
+    pub fn add_link_to_journal(&self, title: &str, link: &str) -> Result<()> {
+        if !Path::new(&self.journal_path).exists() {
+            self.create().expect("could not create journal")
+        };
+
+        let mut journalfile = OpenOptions::new()
+            .append(true)
+            .open(&self.journal_path)
+            .expect("could not append to journal");
+
+        journalfile
+                .write_all(format!("* [{}]({})\n", title, link).as_bytes())
+                .expect("could not write to journal");
+
+        Ok(())
+
     }
 
     pub fn add_task_to_journal(&self, task: &Task) {
