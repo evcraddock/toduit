@@ -54,6 +54,13 @@ enum Action {
 
         #[structopt(short = "p", long = "project", default_value = "General")]
         project: String,
+    },
+    ChangeProject {
+        task: String,
+        new_project: String,
+        
+        #[structopt(short = "p", long = "project", default_value = "General")]
+        project: String,
     }
 }
 
@@ -138,6 +145,44 @@ fn main() {
             
             task.remove_from_task_folder(&project_folder);
             remove_from_lists(&settings.get_setting("root-folder"), &task_name, "");
+        }
+        Action::ChangeProject {
+            task,
+            new_project,
+            project
+        } => {
+            let date = Local::now();
+            let project_root_folder = settings.get_project_folder_by_year(&date.year());
+            let project_folder = format!(
+                "{}/{}",
+                project_root_folder,
+                project,
+            );
+
+
+            let c_task = Task::get_by_id_or_name(&task, &project_folder, true)
+                .expect("the task is either already complete or cannot be found");
+
+            Task::change_project(&task, &project_root_folder, &c_task.project, &new_project)
+                .expect("could not change the project path");
+
+            let mut new_task = c_task;
+
+            new_task.project = new_project.to_string();
+            new_task.path = format!(
+                "{}/{}/{}/{}.md", 
+                settings.get_setting("project-folder-name"),
+                date.year(),
+                new_project,
+                new_task.task_name
+            );
+
+            new_task.save(&settings.get_setting("root-folder"))
+                .expect("could not save task");
+
+
+//            println!("Task: {}", task.task_name);
+
         }
     }
 }

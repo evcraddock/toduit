@@ -7,16 +7,19 @@ use chrono::DateTime;
 use pulldown_cmark::{Event, Options, Parser, Tag};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
+use std::io::{Error, ErrorKind};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::Result;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
+use walkdir::WalkDir;
 
 use crate::util::date_format;
 
+#[derive(Debug)]
 #[derive(Serialize, Deserialize)]
 pub struct Task {
     pub id: String,
@@ -67,6 +70,46 @@ impl Task {
         let task: Task = serde_yaml::from_str(&ymltask).unwrap();
 
         Ok(task)
+    }
+
+    pub fn get_by_id_or_name(task: &str, project_folder: &str, new_only: bool) -> Result<Task> {
+        
+        for entry in WalkDir::new(project_folder)
+            .follow_links(true)
+                .into_iter()
+                .filter_map(|e| e.ok()) {
+                    let f_path = entry.path().to_str().unwrap();
+
+                    if f_path.ends_with(".md") {
+                        if new_only && !f_path.contains("/new/") {
+                            continue;
+                        }
+
+                        let f_task = Task::get(f_path)?;
+                        if f_task.id == task || f_task.task_name == task {
+                            return Ok(f_task);
+                        }
+                    }
+        }
+
+        Err(Error::new(ErrorKind::NotFound, "not found"))
+    }
+
+    pub fn change_project(task_name: &str, project_root_folder: &str, old_project: &str, new_project: &str) -> Result<()> {
+        let task_path = format!("{}/{}/new/{}.md", project_root_folder, old_project, task_name);
+        
+        if !Path::new(&task_path).exists() {
+            return Err(Error::new(ErrorKind::NotFound, "task file not found"));
+        }
+    
+        let new_path = task_path.replace(&old_project, new_project);
+        if !Path::new(&Task::get_new_folder(&new_path)).exists() {
+            fs::create_dir_all(&new_path)?;
+        }
+
+        // println!("old path: {}\nnew path: {}\n", task_path, new_path);           
+        fs::rename(task_path, new_path).expect("could not rename the file");
+        Ok(())
     }
 
     pub fn get_from_list(listpath: &str, taskfolder: &str) -> Result<Task> {
@@ -124,6 +167,39 @@ impl Task {
         Ok(())
     }
 
+    pub fn save(self, root_folder: &str) -> Result<()> {
+        let mut task = self;
+        if task.id == "" || task.id == "~" {
+            task.id = Uuid::new_v4().to_string();
+        }
+
+        let ymltask = serde_yaml::to_string(&task).unwrap();
+        
+        let task_path = Task::get_new_folder(&task.path);
+        let file_path = format!("{}/{}/new/{}.md", root_folder, task_path, task.task_name);
+
+        if !Path::new(&file_path).exists() {
+            return Err(Error::new(ErrorKind::NotFound, "task file not found"));
+        };
+
+        let data = fs::read_to_string(&file_path).expect("unable to read file");
+        let contents: Vec<&str> = data.split("---").collect();
+
+        let mut task_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&file_path)
+            .expect("could not open task file");
+    
+        task_file.write_all(format!("{} \n---", ymltask).as_bytes())?;
+        task_file.write_all(contents[2].as_bytes())?;
+        
+        task_file.sync_data()?;
+
+        Ok(())
+    }
+    
     pub fn change_task_folder(&self, task_folder: &str) {
         let filepath = format!(
             "{}/{}/new/{}.md",
@@ -137,8 +213,6 @@ impl Task {
             self.project,
             self.task_name
         );
-
-        println!("new-path: {}", newpath);
 
         if Path::new(&filepath).exists() {
             fs::rename(filepath, &newpath).expect("could not rename the file");
@@ -164,6 +238,30 @@ impl Task {
             fs::rename(oldpath, &newpath).expect("could not rename the file");
         }
     }
+
+    fn get_new_folder(task_path: &str) -> String {
+        let mut entries: Vec<&str> = task_path.split_terminator("/").collect();
+        entries.remove(entries.len() -1);
+
+        entries.join("/")
+    }
+}
+
+pub fn update_project(project_folder: &str, old_project: &str, new_project: &str) -> Result<()> {
+   for entry in WalkDir::new(project_folder)
+       .follow_links(true)
+           .into_iter()
+           .filter_map(|e| e.ok()) {
+               let f_path = entry.path().to_str().unwrap();
+               // let n_path = String::new();
+               if f_path.ends_with(".md") && f_path.contains("/new/") {
+                   let n_path = f_path.replace(old_project, new_project);
+                   println!("old path: {}\nnew path: {}\n", f_path, n_path);           
+               }
+   }
+
+   //  Err(Error::new(ErrorKind::NotFound, "not found"))
+   Ok(())
 }
 
 pub fn get_taskfolder(task_folder: &str, project: &str, is_new: bool) -> Result<String> {

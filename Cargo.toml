@@ -24,4 +24,5 @@ serde_derive = "1.0.104"
 serde_yaml = "0.8.11"
 pulldown-cmark = { version = "0.7.0" }
 uuid = { version = "0.4", features = ["serde", "v4"] }
+walkdir = "2"
 
