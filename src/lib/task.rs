@@ -95,6 +95,38 @@ impl Task {
         Err(Error::new(ErrorKind::NotFound, "not found"))
     }
 
+    pub fn year_turnover(root_folder: &str, old_year: &str, new_year: &str) -> Result<()> {
+        let project_root_folder = format!("{}/Projects/{}", root_folder, old_year);
+        for entry in WalkDir::new(project_root_folder)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok()) {
+                let f_path = entry.path().to_str().unwrap();
+                if f_path.ends_with(".md") && f_path.contains("/new/") {
+                    let new_task_path = f_path.replace(&old_year, &new_year);
+                    let new_path = Task::get_new_folder(&new_task_path);
+                    if !Path::new(&new_path).exists() {
+                        match fs::create_dir_all(&new_path){
+                            Ok(v) => v,
+                            Err(e) => eprintln!("could not create folder {} with error {}", new_path, e),
+                        }
+                    }
+
+                    match fs::rename(f_path, &new_task_path) {
+                        Ok(v) => v,
+                        Err(e) => eprintln!("could not rename {} with error {}", f_path, e),
+                    };
+
+                    let mut f_task = Task::get(&new_task_path)?;
+                    f_task.path = f_task.path.replace(&old_year, &new_year);
+                    f_task.save(&root_folder).expect("could not save task");
+                }
+            }
+
+        Ok(())
+
+    }
+
     pub fn change_project(task_name: &str, project_root_folder: &str, old_project: &str, new_project: &str) -> Result<()> {
         let task_path = format!("{}/{}/new/{}.md", project_root_folder, old_project, task_name);
         
@@ -253,14 +285,12 @@ pub fn update_project(project_folder: &str, old_project: &str, new_project: &str
            .into_iter()
            .filter_map(|e| e.ok()) {
                let f_path = entry.path().to_str().unwrap();
-               // let n_path = String::new();
                if f_path.ends_with(".md") && f_path.contains("/new/") {
                    let n_path = f_path.replace(old_project, new_project);
                    println!("old path: {}\nnew path: {}\n", f_path, n_path);           
                }
    }
 
-   //  Err(Error::new(ErrorKind::NotFound, "not found"))
    Ok(())
 }
 

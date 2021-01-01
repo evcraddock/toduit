@@ -61,6 +61,10 @@ enum Action {
         
         #[structopt(short = "p", long = "project", default_value = "General")]
         project: String,
+    },
+    TurnoverYear {
+        old_year: String,
+        new_year: String,
     }
 }
 
@@ -179,10 +183,12 @@ fn main() {
 
             new_task.save(&settings.get_setting("root-folder"))
                 .expect("could not save task");
-
-
-//            println!("Task: {}", task.task_name);
-
+        }
+        Action::TurnoverYear {
+            old_year,
+            new_year,
+        } => {
+            Task::year_turnover(&settings.get_setting("root-folder"), &old_year, &new_year).expect("year turnover failed");
         }
     }
 }
