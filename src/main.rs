@@ -65,6 +65,10 @@ enum Action {
     TurnoverYear {
         old_year: String,
         new_year: String,
+    },
+    Review {
+        #[structopt(short = "p", long = "project", default_value = "")]
+        project: String,
     }
 }
 
@@ -189,6 +193,23 @@ fn main() {
             new_year,
         } => {
             Task::year_turnover(&settings.get_setting("root-folder"), &old_year, &new_year).expect("year turnover failed");
+        }
+        Action::Review {
+            project
+        } => {
+            let date = Local::now();
+            let project_root_folder = settings.get_project_folder_by_year(&date.year());
+            let project_folder = format!(
+                "{}/{}",
+                project_root_folder,
+                project,
+            );
+
+              
+            let review_folder = settings.get_review_folder_by_date(&date).unwrap();
+            let tasks = Task::get_all(&project_folder, true).unwrap();
+
+            Task::create_review(tasks, &review_folder).expect("could not create review file");
         }
     }
 }

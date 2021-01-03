@@ -72,6 +72,28 @@ impl Task {
         Ok(task)
     }
 
+    pub fn get_all(project_folder: &str, new_only: bool) -> Result<Vec<Task>> {
+        let mut task_list: Vec<Task> = Vec::new();
+        for entry in WalkDir::new(project_folder)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok()) {
+                let f_path = entry.path().to_str().unwrap();
+                if f_path.ends_with(".md") {
+                    if new_only && !f_path.contains("/new/") {
+                        continue;
+                    }
+                    
+                    match Task::get(f_path) {
+                        Ok(v) => task_list.push(v),
+                        Err(e) => eprintln!("could not find task {} with error {}", f_path, e),
+                    }
+                }
+            }
+
+        Ok(task_list)
+    }
+
     pub fn get_by_id_or_name(task: &str, project_folder: &str, new_only: bool) -> Result<Task> {
         
         for entry in WalkDir::new(project_folder)
@@ -277,21 +299,56 @@ impl Task {
 
         entries.join("/")
     }
-}
 
-pub fn update_project(project_folder: &str, old_project: &str, new_project: &str) -> Result<()> {
-   for entry in WalkDir::new(project_folder)
-       .follow_links(true)
-           .into_iter()
-           .filter_map(|e| e.ok()) {
-               let f_path = entry.path().to_str().unwrap();
-               if f_path.ends_with(".md") && f_path.contains("/new/") {
-                   let n_path = f_path.replace(old_project, new_project);
-                   println!("old path: {}\nnew path: {}\n", f_path, n_path);           
-               }
-   }
+    pub fn create_review(tasks: Vec<Task>, review_folder: &str) -> Result<()> {
+        let date = Local::now();
+        let review_file_path = format!(
+            "{}/{:02}-{:02}-{} Review.md",
+            review_folder,
+            date.month(),
+            date.day(),
+            date.year()
+        );
+    
+        let mut review_file  = File::create(&review_file_path)?;
+        
+        review_file.write_all(
+            format!(
+                "# {:02}/{:02}/{} Review \n\n",
+                date.month(),
+                date.day(),
+                date.year()
+            ).as_bytes()
+        ).expect("could not write");
+    
+        review_file.write_all(b"## Tasks \n").expect("could not write");
+        let mut current_project = String::new();
+    
+        for task in tasks {
+            
+            if task.project != current_project {
+                review_file.write_all(format!("\n#### {} \n", task.project).as_bytes()).expect("could not write");
+                current_project = task.project.to_string();
+            }
 
-   Ok(())
+            let new_project = &format!("{}/new", &task.project);
+    
+            let new_path = task.path.replace(&task.project, &new_project);
+           // let new_path = &task.path;
+    
+            review_file.write_all(
+                format!(
+                   "* [{}](../../../{}) \n",
+                   task.task_name,
+                   new_path,
+                ).as_bytes()
+            ).expect("failed to write");
+    
+            review_file.sync_data()?;
+        }
+    
+        Ok(())    
+    }
 }
 
 pub fn get_taskfolder(task_folder: &str, project: &str, is_new: bool) -> Result<String> {
@@ -343,4 +400,5 @@ pub fn get_task_path(task_name: &str, project: &str, project_folder: &str) -> Re
 
     Ok(returnpath)
 }
+
 

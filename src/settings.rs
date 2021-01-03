@@ -39,9 +39,28 @@ impl Settings {
         format!("{}/{}", root_folder, journal_folder_name)
     }
 
+    pub fn get_review_folder(&self) -> String {
+        let root_folder = self.get_setting("root-folder");
+        let review_folder_name = self.get_setting("review-folder-name");
+
+        format!("{}/{}", root_folder, review_folder_name)
+    }
+
     pub fn get_journal_folder_by_date(&self, date: &DateTime<Local>) -> Result<String> {
         let strmonth = date.format("%m - %B");
         let folderpath = format!("{}/{}/{}", self.get_journal_folder(), date.year(), strmonth);
+        let file_exists = Path::new(&folderpath).exists();
+
+        if !file_exists {
+            fs::create_dir_all(&folderpath)?;
+        }   
+
+        Ok(folderpath)
+    }
+
+    pub fn get_review_folder_by_date(&self, date: &DateTime<Local>) -> Result<String> {
+        let strmonth = date.format("%m - %B");
+        let folderpath = format!("{}/{}/{}", self.get_review_folder(), date.year(), strmonth);
         let file_exists = Path::new(&folderpath).exists();
 
         if !file_exists {
@@ -81,6 +100,7 @@ fn create_settings_file(dir: &PathBuf) -> Result<()> {
     settingsfile.write_all(format!("root-folder = {:?} \n", home).as_bytes())?;
     settingsfile.write_all(b"project-folder-name = 'Projects' \n")?;
     settingsfile.write_all(b"journal-folder-name = 'Journal' \n")?;
+    settingsfile.write_all(b"review-folder-name = 'Review' \n")?;
 
     Ok(())
 }
