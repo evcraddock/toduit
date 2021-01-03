@@ -157,11 +157,11 @@ impl Task {
         }
     
         let new_path = task_path.replace(&old_project, new_project);
-        if !Path::new(&Task::get_new_folder(&new_path)).exists() {
-            fs::create_dir_all(&new_path)?;
+        let new_folder = &Task::get_new_folder(&new_path);
+        if !Path::new(new_folder).exists() {
+            fs::create_dir_all(&new_folder).expect("could not create folder");
         }
 
-        // println!("old path: {}\nnew path: {}\n", task_path, new_path);           
         fs::rename(task_path, new_path).expect("could not rename the file");
         Ok(())
     }
