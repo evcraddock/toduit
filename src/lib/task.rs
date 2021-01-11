@@ -95,7 +95,6 @@ impl Task {
     }
 
     pub fn get_by_id_or_name(task: &str, project_folder: &str, new_only: bool) -> Result<Task> {
-        
         for entry in WalkDir::new(project_folder)
             .follow_links(true)
                 .into_iter()
@@ -254,23 +253,29 @@ impl Task {
         Ok(())
     }
     
-    pub fn change_task_folder(&self, task_folder: &str) {
-        let filepath = format!(
-            "{}/{}/new/{}.md",
-            task_folder,
-            self.project,
-            self.task_name
-        );
-        let newpath = format!(
-            "{}/{}/{}.md",
-            task_folder,
-            self.project,
-            self.task_name
+    pub fn change_task_folder(&self, root_folder: &str) -> Result<()> {
+        let mut entries: Vec<&str> = self.path.split_terminator("/").collect();
+        entries.remove(entries.len() -1);
+
+        let file_path = format!(
+            "{}/{}/{}/{}.md",
+            root_folder,
+            entries.join("/"),
+            "/new/",
+            &self.task_name
         );
 
-        if Path::new(&filepath).exists() {
-            fs::rename(filepath, &newpath).expect("could not rename the file");
-        }
+        let new_path = format!(
+            "{}/{}",
+            root_folder,
+            &self.path
+        );
+
+        if Path::new(&file_path).exists() {
+            fs::rename(file_path, &new_path).expect("could not rename the file");
+        };
+
+        Ok(())
     }
 
     pub fn remove_from_task_folder(&self, task_folder: &str) {

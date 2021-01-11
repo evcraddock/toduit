@@ -1,13 +1,12 @@
 extern crate chrono;
 mod settings;
-mod task_list;
 
 use chrono::prelude::*;
 use toduitl::journal::*;
 use toduitl::task::*;
 use structopt::StructOpt;
 use settings::*;
-use task_list::*;
+use toduitl::task_list::*;
 
 #[derive(StructOpt)]
 struct Cli {
@@ -36,7 +35,7 @@ enum Action {
         #[structopt(short = "y", long = "year", default_value = "")]
         year: String,
 
-        #[structopt(short = "p", long = "project", default_value = "General")]
+        #[structopt(short = "p", long = "project", default_value = "")]
         project: String,
     },
     List {
@@ -107,26 +106,16 @@ fn main() {
             year,
             project,
         } => {
-            let listpath = &format!("{}/{}", settings.get_setting("root-folder"), &list_name);
-            let project_year = get_project_year(&year);
-            let project_folder = settings.get_project_folder_by_year(&project_year);
-            let taskpath = get_task_path(&task_name, &project, &project_folder).unwrap();
-            let task = Task::get(&taskpath).unwrap();
+            let project_folder = format!(
+                "{}/{}",
+                settings.get_project_folder_by_year(&get_project_year(&year)),
+                project
+            );
 
-            if put_in_list(&listpath, &task).unwrap() {
-                task.change_task_folder(&settings.get_project_folder_by_year(&project_year));
-                remove_from_lists(&settings.get_setting("root-folder"), &task_name, &list_name);
-
-                let journalfolder = settings.get_journal_folder_by_date(&Local::now()).unwrap();
-                // TODO add ability  to add customer header and subheader 
-                let journal = Journal::new("Journal", "My Thoughts Today", &journalfolder);
-
-                if list_name == "Today" {
-                    journal.add_task_to_journal(&task);
-                }
-            } else {
-                println!("Could not add the item to the list");
-            }
+            let task = Task::get_by_id_or_name(&task_name, &project_folder, false)
+                .expect("could not find task");
+            let list = TaskList::get(&list_name, &settings.get_setting("root-folder"));
+            list.add(&task).expect("could not list task");
         }
         Action::AddJournal => {
             let journalfolder = settings.get_journal_folder_by_date(&Local::now()).unwrap();
@@ -152,7 +141,7 @@ fn main() {
             let task = Task::get(&taskpath).unwrap();
             
             task.remove_from_task_folder(&project_folder);
-            remove_from_lists(&settings.get_setting("root-folder"), &task_name, "");
+            toduitl::task_list::remove_from_lists(&settings.get_setting("root-folder"), &task_name, "");
         }
         Action::ChangeProject {
             task,
