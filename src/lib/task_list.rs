@@ -8,6 +8,7 @@ use std::io::{ BufReader, Result, Write };
 use std::path::{ Path, PathBuf};
 
 use pulldown_cmark::{Event, Options, Parser, Tag};
+use walkdir::WalkDir;
 
 use crate::task::Task;
 use crate::journal::*;
@@ -47,32 +48,46 @@ impl TaskList {
         Ok(())
     }
 
-    pub fn get_tasks(&self, taskfolder: &str) -> Result<Task> {
-        let p = PathBuf::from(&self.path);
+    pub fn get_tasks(&self, taskfolder: &str) -> Result<Vec<Task>> {
+        let mut tasks_list: Vec<Task> = Vec::new();
+        for entry in WalkDir::new(&self.path)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok()) {
+                let list_path = entry.path().to_str().unwrap();
+                
+                if !list_path.ends_with(".md") {
+                    continue;
+                }
+                
+                let p = PathBuf::from(&list_path);
+                let task_file = File::open(p).expect("could not open file");
+                let mut contents = String::new();
+                let mut buf_reader = BufReader::new(task_file);
 
-        let taskfile = File::open(p)?;
-        let mut contents = String::new();
-        let mut ymllink = String::new();
-        let mut buf_reader = BufReader::new(taskfile);
+                buf_reader.read_to_string(&mut contents)?;
+                // Markdown parser is unable to read links
+                // with spaces in the path
+                // Replacing with encoded space to be removed
+                // before opening the file later
+                contents = contents.replace(" ", "%20");
 
-        buf_reader.read_to_string(&mut contents)?;
-        // Markdown parser is unable to read links
-        // with spaces in the path
-        // Replacing with encoded space to be removed
-        // before opening the file later
-        contents = contents.replace(" ", "%20");
+                let options = Options::empty();
+                let parser = Parser::new_ext(&contents, options);
 
-        let options = Options::empty();
-        let parser = Parser::new_ext(&contents, options);
-
-        let ps: Vec<Event> = parser.collect();
-        for p in &ps {
-            if let Event::Start(Tag::Link(_, dest, _)) = p {
-                ymllink = dest.replace("..", &taskfolder).replace("%20", " ");
-            }
+                let ps: Vec<Event> = parser.collect();
+                for p in &ps {
+                    if let Event::Start(Tag::Link(_, dest, _)) = p {
+                        let entries: Vec<&str> = dest.split_terminator("/").collect();
+                        let task_name = entries[entries.len() -1].replace("%20", " ").replace(".md", "");
+                        let etask = Task::get_by_id_or_name(&task_name, &taskfolder, false).expect("could not get task");
+                        tasks_list.push(etask);
+                       // ymllink = dest.replace("..", &taskfolder).replace("%20", " ");
+                    }
+                }
         }
 
-        Task::get(&ymllink)
+        Ok(tasks_list)
     }
 }
 

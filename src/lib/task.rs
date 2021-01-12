@@ -168,12 +168,12 @@ impl Task {
     pub fn get_from_list(listpath: &str, taskfolder: &str) -> Result<Task> {
         let p = PathBuf::from(listpath);
 
-        let taskfile = File::open(p)?;
+        let taskfile = File::open(p).expect("could not open taskfile");
         let mut contents = String::new();
         let mut ymllink = String::new();
         let mut buf_reader = BufReader::new(taskfile);
 
-        buf_reader.read_to_string(&mut contents)?;
+        buf_reader.read_to_string(&mut contents).expect("could not read string to buffer");
         // Markdown parser is unable to read links
         // with spaces in the path
         // Replacing with encoded space to be removed
@@ -337,10 +337,7 @@ impl Task {
             }
 
             let new_project = &format!("{}/new", &task.project);
-    
             let new_path = task.path.replace(&task.project, &new_project);
-           // let new_path = &task.path;
-    
             review_file.write_all(
                 format!(
                    "* [{}](../../../{}) \n",
@@ -376,7 +373,8 @@ pub fn get_tasks(listfolder: &str, projectfolder: &str) -> Vec<Task> {
     for file in files {
         let filename = file.unwrap().file_name().into_string().unwrap();
         let task =
-            Task::get_from_list(&format!("{}/{}", listfolder, filename), projectfolder).unwrap();
+            Task::get_from_list(&format!("{}/{}", listfolder, filename), projectfolder)
+                .expect("could not get task from list");
         v.push(task);
     }
 
