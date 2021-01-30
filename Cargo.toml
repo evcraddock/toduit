@@ -1,6 +1,6 @@
 [package]
 name = "toduit"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Erik Craddock <erik@erikvancraddock.com>"]
 edition = "2018"
 
