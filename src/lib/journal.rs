@@ -18,44 +18,25 @@ pub struct Journal {
 }
 
 impl Journal {
-    pub fn new(title: &str, subheader: &str, journal_folder: &str) -> Journal {
+    pub fn new(title: &str, subheader: &str) -> Result<Journal> {
+        let journal_path = crate::setting::get_journal_folder();
         let created = Local::now();
         let filepath = format!(
             "{}/{:02}-{:02}-{} Journal.md",
-            journal_folder,
+            journal_path,
             created.month(),
             created.day(),
             created.year()
         );
 
-        Journal {
+        let journal = Journal {
             title: title.to_string(),
             subheader: subheader.to_string(),
             created,
             journal_path: filepath,
-        }
-    }
-
-    pub fn get(date: DateTime<Local>, journal_folder: &str) -> Result<Journal> {
-        let strmonth = date.format("%m - %B");
-        let file_path = format!(
-            "{}/{}/{}/{:02}-{:02}-{} Journal.md",
-            journal_folder,
-            date.year(),
-            strmonth,
-            date.month(),
-            date.day(),
-            date.year()
-        );
-
-        let new_journal = Journal {
-            title: String::new(),
-            subheader: String::new(),
-            created: date,
-            journal_path: file_path,
         };
 
-        Ok(new_journal)
+        Ok(journal)
     }
 
     pub fn create(&self) -> Result<()> {

@@ -1,6 +1,5 @@
 extern crate chrono;
 
-use chrono::prelude::*;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
@@ -16,15 +15,13 @@ use crate::journal::*;
 pub struct TaskList {
     pub name: String,
     pub path: String,
-    pub root_path: String,
 }
 
 impl TaskList {
-    pub fn get(name: &str, root_path: &str) -> TaskList {
+    pub fn get(name: &str) -> TaskList {
         TaskList {
             name: name.to_string(),
-            path: format!("{}/{}", root_path, name),
-            root_path: root_path.to_string(),
+            path: format!("{}/{}", crate::setting::get_root_folder(), name),
         }
     }
 
@@ -34,13 +31,11 @@ impl TaskList {
             let mut listfile = File::create(&listpath)?;
             let task_link = format!("[{}](../{})", &task.task_name, &task.path);
             listfile.write_all(task_link.as_bytes())?;
-            Task::change_task_folder(&task, &self.root_path).expect("could not change task folder");
-            remove_from_lists(&self.root_path, &task.task_name, &self.name);
+            Task::change_task_folder(&task).expect("could not change task folder");
+            remove_from_lists(&task.task_name, &self.name);
             
-            let journalfolder = format!("{}/Journal", &self.root_path);
-            let journal = Journal::get(Local::now(), &journalfolder).expect("could not create journal");
-
             if &self.name == "Today" {
+                let journal = Journal::new("Current", "Journal").expect("could not find journal");
                 journal.add_task_to_journal(&task);
             }
         }        
@@ -48,7 +43,7 @@ impl TaskList {
         Ok(())
     }
 
-    pub fn get_tasks(&self, taskfolder: &str) -> Result<Vec<Task>> {
+    pub fn get_tasks(&self) -> Result<Vec<Task>> {
         let mut tasks_list: Vec<Task> = Vec::new();
         for entry in WalkDir::new(&self.path)
             .follow_links(true)
@@ -80,9 +75,8 @@ impl TaskList {
                     if let Event::Start(Tag::Link(_, dest, _)) = p {
                         let entries: Vec<&str> = dest.split_terminator("/").collect();
                         let task_name = entries[entries.len() -1].replace("%20", " ").replace(".md", "");
-                        let etask = Task::get_by_id_or_name(&task_name, &taskfolder, false).expect("could not get task");
+                        let etask = Task::get_by_id_or_name(&task_name, false, "").expect("could not get task");
                         tasks_list.push(etask);
-                       // ymllink = dest.replace("..", &taskfolder).replace("%20", " ");
                     }
                 }
         }
@@ -91,12 +85,13 @@ impl TaskList {
     }
 }
 
-pub fn remove_from_lists(list_folder: &str, task_name: &str, excluded_list: &str) {
+pub fn remove_from_lists(task_name: &str, excluded_list: &str) {
     // TODO: this list should be pulled from configuration
+    let root_folder = crate::setting::get_root_folder();
     let valid_list = ["Queued", "Today", "Waiting"];
     for list in valid_list.iter() {
         if list.to_string() != excluded_list {
-            let filepath = format!("{}/{}/{}.md", list_folder, list.to_string(), task_name);
+            let filepath = format!("{}/{}/{}.md", root_folder, list.to_string(), task_name);
             if Path::new(&filepath).exists() {
                 fs::remove_file(filepath).expect("could not remove from list");
             }
