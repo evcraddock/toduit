@@ -32,24 +32,15 @@ enum Action {
         task_name: String,
         list_name: String,
 
-        #[structopt(short = "y", long = "year", default_value = "")]
-        year: String,
-
         #[structopt(short = "p", long = "project", default_value = "")]
         project: String,
     },
     List {
         list_name: String,
-
-        #[structopt(short = "y", long = "year", default_value = "")]
-        year: String,
     },
     AddJournal, 
     Unlist {
         task_name: String,
-
-        #[structopt(short = "y", long = "year", default_value = "")]
-        year: String,
 
         #[structopt(short = "p", long = "project", default_value = "")]
         project: String,
@@ -73,132 +64,81 @@ enum Action {
 
 fn main() {
     let args = Cli::from_args();
-    let settings = Settings::new();
+    Settings::new();
 
     match args.action {
         Action::Create { task_name, description, year, project } => {
             let project_year = get_project_year(&year);
-            let project_folder = settings.get_project_folder_by_year(&project_year);
-
             let task = Task::new(
                 &task_name,
                 &project,
-                &settings.get_setting("project-folder-name"),
                 &project_year,
             );
 
-            task.add(&description, &project_folder)
-                .expect("could not add task");
+            task.add(&description).expect("could not add task");
         }
-        Action::List { list_name, year } => {
-            let task_list = TaskList::get(&list_name, &settings.get_setting("root-folder"));
-            let tasks = task_list.get_tasks(&settings.get_project_folder_by_year(&get_project_year(&year)))
+        Action::List { list_name } => {
+            let task_list = TaskList::get(&list_name);
+            let tasks = task_list.get_tasks()
                 .expect("could not get task list");
 
             for task in tasks {
                 println!("{} - {}", task.project, task.task_name);
             }
+
         }
         Action::Add {
             task_name,
             list_name,
-            year,
-            project,
+            project
         } => {
-            let project_folder = format!(
-                "{}/{}",
-                settings.get_project_folder_by_year(&get_project_year(&year)),
-                project
-            );
-
-            let task = Task::get_by_id_or_name(&task_name, &project_folder, false)
+            let task = Task::get_by_id_or_name(&task_name, false, &project)
                 .expect("could not find task");
-            let list = TaskList::get(&list_name, &settings.get_setting("root-folder"));
+            let list = TaskList::get(&list_name);
             list.add(&task).expect("could not list task");
         }
         Action::AddJournal => {
-            let journalfolder = settings.get_journal_folder_by_date(&Local::now()).unwrap();
-            let journal = Journal::new("Journal", "My Thoughts Today", &journalfolder);
-
+            let journal = Journal::new("Journal", "My Thoughts Today").expect("could not find journal path");
             journal.create().expect("could not create journal");
-            let task_list = TaskList::get("Today", &settings.get_setting("root-folder"));
-            let tasks = task_list.get_tasks(&settings.get_project_folder_by_year(&Local::now().year()))
+            
+            let task_list = TaskList::get("Today");
+            let tasks = task_list.get_tasks()
                 .expect("could not get task list");
 
             journal.add_tasks_to_journal(tasks);
         }
         Action::Unlist {
             task_name,
-            year,
             project
         }=> {
-            let project_folder = format!(
-                "{}/{}",
-                settings.get_project_folder_by_year(&get_project_year(&year)),
-                project
-            );
-            let task = Task::get_by_id_or_name(&task_name, &project_folder, false)
+            let task = Task::get_by_id_or_name(&task_name, false, &project)
                 .expect("could not find task");
             
-            task.remove_from_task_folder(&project_folder);
-            toduitl::task_list::remove_from_lists(&settings.get_setting("root-folder"), &task_name, "");
+            task.move_to_new_folder();
+            toduitl::task_list::remove_from_lists(&task_name, "");
         }
         Action::ChangeProject {
             task,
             new_project,
             project
         } => {
-            let date = Local::now();
-            let project_root_folder = settings.get_project_folder_by_year(&date.year());
-            let project_folder = format!(
-                "{}/{}",
-                project_root_folder,
-                project,
-            );
-
-
-            let c_task = Task::get_by_id_or_name(&task, &project_folder, true)
+            let c_task = Task::get_by_id_or_name(&task, true, &project)
                 .expect("the task is either already complete or cannot be found");
 
-            Task::change_project(&task, &project_root_folder, &c_task.project, &new_project)
+            Task::change_project(&task, &c_task.project, &new_project)
                 .expect("could not change the project path");
-
-            let mut new_task = c_task;
-
-            new_task.project = new_project.to_string();
-            new_task.path = format!(
-                "{}/{}/{}/{}.md", 
-                settings.get_setting("project-folder-name"),
-                date.year(),
-                new_project,
-                new_task.task_name
-            );
-
-            new_task.save(&settings.get_setting("root-folder"))
-                .expect("could not save task");
         }
         Action::TurnoverYear {
             old_year,
             new_year,
         } => {
-            Task::year_turnover(&settings.get_setting("root-folder"), &old_year, &new_year).expect("year turnover failed");
+            Task::year_turnover(&old_year, &new_year).expect("year turnover failed");
         }
         Action::Review {
             project
         } => {
-            let date = Local::now();
-            let project_root_folder = settings.get_project_folder_by_year(&date.year());
-            let project_folder = format!(
-                "{}/{}",
-                project_root_folder,
-                project,
-            );
-
-              
-            let review_folder = settings.get_review_folder_by_date(&date).unwrap();
-            let tasks = Task::get_all(&project_folder, true).unwrap();
-
-            Task::create_review(tasks, &review_folder).expect("could not create review file");
+            let tasks = Task::get_all(true, &project).unwrap();
+            Task::create_review(tasks).expect("could not create review file");
         }
     }
 }
