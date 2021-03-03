@@ -17,9 +17,10 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 
 use crate::util::date_format;
+use crate::task_list;
 
 #[derive(Debug)]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Task {
     pub id: String,
     pub task_name: String,
@@ -28,7 +29,10 @@ pub struct Task {
 
     #[serde(with = "date_format")]
     pub created: DateTime<Local>,
+    #[serde(with = "date_format")]
+    pub updated: DateTime<Local>,
     pub exclude_from_journal: bool,
+
 }
 
 impl Task {
@@ -48,6 +52,7 @@ impl Task {
             project: project.to_string(),
             path: task_path,
             created,
+            updated: created,
             exclude_from_journal: false,
         }
     }
@@ -66,7 +71,22 @@ impl Task {
             ymltask.push_str("id: ");
         }
 
-        let task: Task = serde_yaml::from_str(&ymltask).unwrap();
+        if ymltask.find("updated:").is_none() {
+             let today = Local::now();
+             let todaystr = format!(
+                "{:02}-{:02}-{:02} {:02}:{:02}:{:02}",
+                today.year(),
+                today.month(),
+                today.day(),
+                00,
+                00, 
+                00               
+             );
+
+             ymltask.push_str(&format!("updated: \"{}\"", todaystr));
+        }
+
+        let task: Task = serde_yaml::from_str(&ymltask).expect("could not deserialize");
 
         Ok(task)
     }
@@ -106,7 +126,6 @@ impl Task {
             crate::setting::get_project_folder(),
             if project != "" { project } else { "" }
         );
-        
             
         for entry in WalkDir::new(&project_folder)
             .follow_links(true)
@@ -161,21 +180,29 @@ impl Task {
 
     }
 
-    pub fn change_project(task_name: &str, old_project: &str, new_project: &str) -> Result<()> {
+    pub fn change_project(&self, new_project: &str) -> Result<()> {
+        let old_project = &self.project;
+        Task::add_comment(&self, &format!("Project changed to {}", new_project), true)?;
         let project_root_folder = crate::setting::get_project_folder();
-        let task_path = format!("{}/{}/new/{}.md", project_root_folder, old_project, task_name);
+        let task_path = format!("{}/{}/new/{}.md", project_root_folder, old_project, &self.task_name);
         
         if !Path::new(&task_path).exists() {
             return Err(Error::new(ErrorKind::NotFound, "task file not found"));
         }
     
-        let new_path = task_path.replace(&old_project, new_project);
+        let new_path = task_path.replace(old_project, new_project);
         let new_folder = &Task::get_new_folder(&new_path);
         if !Path::new(new_folder).exists() {
             fs::create_dir_all(&new_folder).expect("could not create folder");
         }
 
-        fs::rename(task_path, new_path).expect("could not rename the file");
+        fs::rename(task_path, &new_path).expect("could not rename the file"); 
+
+        let mut task = Task::get(&new_path).expect("could not load task").clone();
+        task.project = new_project.to_string();
+        task.path = task.path.replace(old_project, new_project);
+        task.save().expect("could not save task");
+
         Ok(())
     }
 
@@ -197,8 +224,8 @@ impl Task {
             if is_pm { "PM" } else { "AM" }
         );
         taskfile.write_all(format!("{} \n---\n", ymltask).as_bytes())?;
-        taskfile.write_all(format!("# {} \n\n", self.task_name).as_bytes())?;
-        taskfile.write_all(format!("##### {} \nTask Created", today).as_bytes())?;
+        taskfile.write_all(format!("##### {} \nTask Created\n\n", today).as_bytes())?;
+        taskfile.write_all(format!("# {} \n", self.task_name).as_bytes())?;
         if description != "" {
             taskfile.write_all(format!("\n\n[link]({})", description).as_bytes())?;
         }
@@ -213,6 +240,7 @@ impl Task {
             task.id = Uuid::new_v4().to_string();
         }
 
+        task.updated = Local::now();
         let ymltask = serde_yaml::to_string(&task).unwrap();
         let task_path = Task::get_new_folder(&task.path);
         let file_path = format!("{}/{}.md", task_path, task.task_name);
@@ -230,8 +258,61 @@ impl Task {
             .create(true)
             .open(&file_path)
             .expect("could not open task file");
-    
+        
         task_file.write_all(format!("{} \n---", ymltask).as_bytes())?;
+        task_file.write_all(contents[2].as_bytes())?;
+        
+        task_file.sync_data()?;
+
+        Ok(())
+    }
+
+    pub fn finish(&self) -> Result<()> {
+        Task::add_comment(&self, "Task Completed", false)?;
+        
+        task_list::remove_from_lists(&self.task_name, "none");
+
+        Ok(())
+    }
+
+    pub fn add_comment(&self, comment: &str, is_new: bool) -> Result<()> {
+        let mut task = self.clone();
+        let updated = Local::now();
+        task.updated = updated;
+        let ymltask = serde_yaml::to_string(&task).unwrap();
+        let mut file_path = format!("{}/{}", crate::setting::get_root_folder(), &task.path);
+        if is_new {
+           let new_path = Task::get_new_folder(&task.path);
+           file_path = format!("{}/{}.md", new_path, &self.task_name);
+        }
+
+        if !Path::new(&file_path).exists() {
+            return Err(Error::new(ErrorKind::NotFound, "task file not found"));
+        };
+
+        let data = fs::read_to_string(&file_path).expect("unable to read file");
+        let contents: Vec<&str> = data.split("---").collect();
+
+        let mut task_file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&file_path)
+            .expect("could not open task file");
+
+        let (is_pm, hour) = updated.hour12();
+        let updated_str = format!(
+            "{:02}/{:02}/{:02} {:02}:{:02} {}",
+            updated.month(),
+            updated.day(),
+            updated.year(),
+            hour,
+            updated.minute(),
+            if is_pm { "PM" } else { "AM" }
+        );
+
+        task_file.write_all(format!("{} \n---\n", ymltask).as_bytes())?;
+        task_file.write_all(format!("##### {} \n{}\n", updated_str, comment).as_bytes())?;
         task_file.write_all(contents[2].as_bytes())?;
         
         task_file.sync_data()?;
