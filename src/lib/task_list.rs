@@ -12,6 +12,7 @@ use walkdir::WalkDir;
 use crate::task::Task;
 use crate::journal::*;
 
+#[derive(Clone)]
 pub struct TaskList {
     pub name: String,
     pub path: String,
@@ -25,7 +26,7 @@ impl TaskList {
         }
     }
 
-    pub fn add(&self, task: &Task) -> Result<()> {
+    pub fn add(&self, task: Task) -> Result<()> {
         if Path::new(&self.path).exists() {
             let listpath = format!("{}/{}.md", &self.path, &task.task_name);
             let mut listfile = File::create(&listpath)?;
@@ -35,9 +36,13 @@ impl TaskList {
             remove_from_lists(&task.task_name, &self.name);
             
             if &self.name == "Today" {
-                let journal = Journal::new("Current", "Journal").expect("could not find journal");
+                let journal = Journal::new("Current", "Journal")
+                    .expect("could not find journal");
+
                 journal.add_task_to_journal(&task);
             }
+
+            task.add_comment(&format!("Added to list {}", &self.name), false)?;
         }        
 
         Ok(())
@@ -74,8 +79,13 @@ impl TaskList {
                 for p in &ps {
                     if let Event::Start(Tag::Link(_, dest, _)) = p {
                         let entries: Vec<&str> = dest.split_terminator("/").collect();
-                        let task_name = entries[entries.len() -1].replace("%20", " ").replace(".md", "");
-                        let etask = Task::get_by_id_or_name(&task_name, false, "").expect("could not get task");
+                        let task_name = entries[entries.len() -1]
+                            .replace("%20", " ")
+                            .replace(".md", "");
+
+                        let etask = Task::get_by_id_or_name(&task_name, false, "")
+                            .expect("could not get task");
+
                         tasks_list.push(etask);
                     }
                 }

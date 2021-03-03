@@ -35,6 +35,12 @@ enum Action {
         #[structopt(short = "p", long = "project", default_value = "")]
         project: String,
     },
+    Finish {
+        task_name: String,
+
+        #[structopt(short = "p", long = "project", default_value = "")]
+        project: String,
+    },
     List {
         list_name: String,
     },
@@ -95,7 +101,16 @@ fn main() {
             let task = Task::get_by_id_or_name(&task_name, false, &project)
                 .expect("could not find task");
             let list = TaskList::get(&list_name);
-            list.add(&task).expect("could not list task");
+            list.add(task).expect("could not list task");
+        }
+        Action::Finish {
+            task_name,
+            project
+        } => {
+            let task = Task::get_by_id_or_name(&task_name, false, &project)
+                .expect("could not find task");
+            
+            task.finish().expect("could not finish");
         }
         Action::AddJournal => {
             let journal = Journal::new("Journal", "My Thoughts Today").expect("could not find journal path");
@@ -113,8 +128,9 @@ fn main() {
         }=> {
             let task = Task::get_by_id_or_name(&task_name, false, &project)
                 .expect("could not find task");
-            
-            task.move_to_new_folder();
+
+            Task::add_comment(&task, "Unlisted", false).expect("could not add comment");
+            Task::move_to_new_folder(&task);
             toduitl::task_list::remove_from_lists(&task_name, "");
         }
         Action::ChangeProject {
@@ -125,7 +141,7 @@ fn main() {
             let c_task = Task::get_by_id_or_name(&task, true, &project)
                 .expect("the task is either already complete or cannot be found");
 
-            Task::change_project(&task, &c_task.project, &new_project)
+            Task::change_project(&c_task, &new_project)
                 .expect("could not change the project path");
         }
         Action::TurnoverYear {
