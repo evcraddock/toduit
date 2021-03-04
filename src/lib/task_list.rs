@@ -96,10 +96,9 @@ impl TaskList {
 }
 
 pub fn remove_from_lists(task_name: &str, excluded_list: &str) {
-    // TODO: this list should be pulled from configuration
     let root_folder = crate::setting::get_root_folder();
-    let valid_list = ["Queued", "Today", "Waiting"];
-    for list in valid_list.iter() {
+    let valid_list = crate::setting::get_todo_list();
+    for list in valid_list.to_string().split(",") {
         if list.to_string() != excluded_list {
             let filepath = format!("{}/{}/{}.md", root_folder, list.to_string(), task_name);
             if Path::new(&filepath).exists() {

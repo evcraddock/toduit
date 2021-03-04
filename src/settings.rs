@@ -37,6 +37,7 @@ impl Settings {
         self.set_environment_variable_setting("project-folder-name", "TODUIT_PROJECT_FOLDER_NAME");
         self.set_environment_variable_setting("journal-folder-name", "TODUIT_JOURNAL_FOLDER_NAME");
         self.set_environment_variable_setting("review-folder-name", "TODUIT_REVIEW_FOLDER_NAME");
+        self.set_environment_variable_setting("todo-lists", "TODUIT_TODO_LISTS");
         self.set_journal_folder(&date);
         self.set_review_folder(&date);
         self.set_project_folder(&date);
@@ -117,6 +118,7 @@ fn create_settings_file(dir: &PathBuf) -> Result<()> {
     settingsfile.write_all(b"project-folder-name = 'Projects' \n")?;
     settingsfile.write_all(b"journal-folder-name = 'Journal' \n")?;
     settingsfile.write_all(b"review-folder-name = 'Review' \n")?;
+    settingsfile.write_all(b"todo-lists = 'Queued,Today,Waiting' \n")?;
 
     Ok(())
 }
@@ -136,5 +138,3 @@ fn get_journal_folder_name() -> String {
 fn get_review_folder_name() -> String {
     env::var("TODUIT_REVIEW_FOLDER_NAME").expect("review folder variable not set")
 }
-
-
