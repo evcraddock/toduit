@@ -25,6 +25,15 @@ enum Action {
         #[structopt(short = "y", long = "year", default_value = "")]
         year: String,
 
+        #[structopt(short = "d", long = "date", default_value = "", help = "MM:DD:YYYY")]
+        date: String,
+
+        #[structopt(short = "t", long = "time", default_value = "", help = "HH:MM")]
+        time: String,
+
+        #[structopt(short = "n", long = "notice", default_value = "")]
+        notice: u32,
+
         #[structopt(short = "p", long = "project", default_value = "General")]
         project: String,
     },
@@ -73,7 +82,15 @@ fn main() {
     Settings::new();
 
     match args.action {
-        Action::Create { task_name, description, year, project } => {
+        Action::Create {
+            task_name,
+            description,
+            year,
+            date,
+            time,
+            notice,
+            project
+        } => {
             let project_year = get_project_year(&year);
             let task = Task::new(
                 &task_name,
@@ -82,6 +99,33 @@ fn main() {
             );
 
             task.add(&description).expect("could not add task");
+
+            if date != "" || time != "" {
+                let mut month  = "";
+                let mut day = "";
+                let mut ryear = "";
+                let mut rtime = "";
+         
+                if date != "" {
+                    let date_val = date.split(":").collect::<Vec<&str>>();
+                    if date_val[0] != "00" {
+                        month = date_val[0];
+                    }
+                    if date_val[1] != "00" {
+                        day = date_val[1];
+                    }
+                    if date_val[2] != "00" {
+                        ryear = date_val[2];
+                    }
+                }
+
+                if time != "" {
+                    rtime = &time;
+                }
+
+                task.set_reminder(&month, &day, &ryear, &rtime, &notice).
+                    expect("could not set reminder");
+            }
         }
         Action::List { list_name } => {
             let task_list = TaskList::get(&list_name);
