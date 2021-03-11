@@ -34,6 +34,7 @@ impl Settings {
         let date = Local::now();
 
         self.set_environment_variable_setting("root-folder", "TODUIT_ROOT_FOLDER");
+        self.set_environment_variable_setting("reminder-file", "TODUIT_REMINDER_FILE");
         self.set_environment_variable_setting("project-folder-name", "TODUIT_PROJECT_FOLDER_NAME");
         self.set_environment_variable_setting("journal-folder-name", "TODUIT_JOURNAL_FOLDER_NAME");
         self.set_environment_variable_setting("review-folder-name", "TODUIT_REVIEW_FOLDER_NAME");
@@ -114,7 +115,13 @@ fn create_settings_file(dir: &PathBuf) -> Result<()> {
         None => PathBuf::from(""),
     };
 
+    let reminder_path: PathBuf = match dirs::home_dir() {
+        Some(path) => path.join(".reminders"),
+        None => PathBuf::from(""),
+    };
+
     settingsfile.write_all(format!("root-folder = {:?} \n", home).as_bytes())?;
+    settingsfile.write_all(format!("reminder-file = {:?} \n", reminder_path).as_bytes())?;
     settingsfile.write_all(b"project-folder-name = 'Projects' \n")?;
     settingsfile.write_all(b"journal-folder-name = 'Journal' \n")?;
     settingsfile.write_all(b"review-folder-name = 'Review' \n")?;

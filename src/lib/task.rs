@@ -18,6 +18,7 @@ use walkdir::WalkDir;
 
 use crate::util::date_format;
 use crate::task_list;
+use crate::reminder::Reminder;
 
 #[derive(Debug)]
 #[derive(Clone, Serialize, Deserialize)]
@@ -31,8 +32,10 @@ pub struct Task {
     pub created: DateTime<Local>,
     #[serde(with = "date_format")]
     pub updated: DateTime<Local>,
+
     pub exclude_from_journal: bool,
 
+    pub remind: Option<Reminder>,
 }
 
 impl Task {
@@ -54,6 +57,7 @@ impl Task {
             created,
             updated: created,
             exclude_from_journal: false,
+            remind: None
         }
     }
 
@@ -223,9 +227,9 @@ impl Task {
             self.created.minute(),
             if is_pm { "PM" } else { "AM" }
         );
+
         taskfile.write_all(format!("{} \n---\n", ymltask).as_bytes())?;
         taskfile.write_all(format!("##### {} \nTask Created\n\n", today).as_bytes())?;
-        taskfile.write_all(format!("# {} \n", self.task_name).as_bytes())?;
         if description != "" {
             taskfile.write_all(format!("\n\n[link]({})", description).as_bytes())?;
         }
@@ -275,31 +279,49 @@ impl Task {
         Ok(())
     }
 
-    pub fn add_comment(&self, comment: &str, is_new: bool) -> Result<()> {
+    pub fn set_reminder(&self, month: &str, day: &str, year: &str, time: &str, notice: &u32) -> Result<()> {
         let mut task = self.clone();
-        let updated = Local::now();
-        task.updated = updated;
-        let ymltask = serde_yaml::to_string(&task).unwrap();
-        let mut file_path = format!("{}/{}", crate::setting::get_root_folder(), &task.path);
-        if is_new {
-           let new_path = Task::get_new_folder(&task.path);
-           file_path = format!("{}/{}.md", new_path, &self.task_name);
-        }
+        let remind = Reminder::new(month, day, year, time, notice);
+        let new_remind = remind.create(&task.task_name);
 
+        match new_remind {
+            Ok(_t) => (),
+            Err(e) => return Err(e)
+        };
+
+        task.remind = Some(remind);
+        task.save()
+    }
+
+    pub fn add_comment(&self, comment: &str, is_new: bool) -> Result<()> {
+        let file_path = match is_new {
+            false => format!("{}/{}",
+                        crate::setting::get_root_folder(),
+                        &self.path
+                     ),
+            true => format!("{}/{}.md",
+                        Task::get_new_folder(&self.path),
+                        &self.task_name
+                    )
+        };
+        
         if !Path::new(&file_path).exists() {
             return Err(Error::new(ErrorKind::NotFound, "task file not found"));
         };
-
-        let data = fs::read_to_string(&file_path).expect("unable to read file");
-        let contents: Vec<&str> = data.split("---").collect();
+        
+        let data;
+        match fs::read_to_string(&file_path) {
+            Ok(d) => data = d,
+            Err(e) => return Err(e)
+        }
 
         let mut task_file = OpenOptions::new()
             .read(true)
             .write(true)
-            .create(true)
             .open(&file_path)
             .expect("could not open task file");
-
+        
+        let updated = Local::now();
         let (is_pm, hour) = updated.hour12();
         let updated_str = format!(
             "{:02}/{:02}/{:02} {:02}:{:02} {}",
@@ -311,15 +333,20 @@ impl Task {
             if is_pm { "PM" } else { "AM" }
         );
 
-        task_file.write_all(format!("{} \n---\n", ymltask).as_bytes())?;
-        task_file.write_all(format!("##### {} \n{}\n", updated_str, comment).as_bytes())?;
+        let contents: Vec<&str> = data.split("---\n").collect();
+        let ymlvalue = contents[1]
+            .trim_start_matches('\n')
+            .trim_end_matches('\n');
+
+
+        task_file.write_all(format!("---\n{}\n---\n", ymlvalue).as_bytes())?;
+        task_file.write_all(format!("##### {} \n{}\n\n", updated_str, comment).as_bytes())?;
         task_file.write_all(contents[2].as_bytes())?;
-        
         task_file.sync_data()?;
 
         Ok(())
     }
-    
+
     pub fn change_task_folder(&self) -> Result<()> {
         let root_folder = crate::setting::get_root_folder();
         let mut entries: Vec<&str> = self.path.split_terminator("/").collect();
