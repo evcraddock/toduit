@@ -39,15 +39,16 @@ impl Journal {
         Ok(journal)
     }
 
-    pub fn create(&self) -> Result<bool> {
-        if Path::new(&self.journal_path).exists() {
-            return Ok(false);
-        };
+    pub fn create(&self) -> Result<()> {
+        let journal_exists = Path::new(&self.journal_path).exists();
+        if journal_exists {
+            Ok(())
+        }
         
         let mut journalfile = match File::create(&self.journal_path) {
             Ok(f) => f,
             Err(e) => return Err(e)
-        };
+        }
 
         journalfile.write_all(
             format!(
@@ -63,11 +64,14 @@ impl Journal {
 
         journalfile.sync_data()?;
 
-        Ok(true)
+        Ok(())
     }
 
     pub fn add_link_to_journal(&self, title: &str, link: &str) -> Result<()> {
-        self.create().expect("could not create journal");
+        if !Path::new(&self.journal_path).exists() {
+            self.create().expect("could not create journal")
+        };
+
         let mut journalfile = OpenOptions::new()
             .append(true)
             .open(&self.journal_path)
@@ -78,10 +82,14 @@ impl Journal {
                 .expect("could not write to journal");
 
         Ok(())
+
     }
 
     pub fn add_task_to_journal(&self, task: &Task) {
-        self.create().expect("could not create journal");
+        if !Path::new(&self.journal_path).exists() {
+            self.create().expect("could not create journal")
+        };
+
         let mut journalfile = OpenOptions::new()
             .append(true)
             .open(&self.journal_path)

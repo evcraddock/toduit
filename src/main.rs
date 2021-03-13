@@ -158,13 +158,14 @@ fn main() {
         }
         Action::AddJournal => {
             let journal = Journal::new("Journal", "My Thoughts Today").expect("could not find journal path");
-            journal.create().expect("could not create journal");
-            
-            let task_list = TaskList::get("Today");
-            let tasks = task_list.get_tasks()
-                .expect("could not get task list");
 
-            journal.add_tasks_to_journal(tasks);
+            if journal.create().unwrap() {
+                let task_list = TaskList::get("Today");
+                let tasks = task_list.get_tasks()
+                    .expect("could not get task list");
+
+                journal.add_tasks_to_journal(tasks);
+            }
         }
         Action::Unlist {
             task_name,
