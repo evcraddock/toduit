@@ -87,7 +87,7 @@ impl Journal {
             .open(&self.journal_path)
             .expect("could not append to journal");
 
-        if !task.exclude_from_journal {
+        if !&task.is_excluded() {
             let link = format!("../../../{}", task.path);
             journalfile
                 .write_all(format!("* [{}]({})\n", task.task_name, link).as_bytes())
@@ -106,7 +106,7 @@ impl Journal {
             .expect("could not write to journal");
 
         for task in tasks {
-            if !task.exclude_from_journal {
+            if !task.is_excluded() {
                 let link = format!("../../../{}", task.path);
                 journalfile
                     .write_all(format!("* [{}]({})\n", task.task_name, link).as_bytes())

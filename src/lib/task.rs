@@ -33,7 +33,8 @@ pub struct Task {
     #[serde(with = "date_format")]
     pub updated: DateTime<Local>,
 
-    pub exclude_from_journal: bool,
+    pub exclude_from_journal: Option<bool>,
+    pub exclude_from_logging: Option<bool>,
 
     pub remind: Option<Reminder>,
 }
@@ -56,7 +57,8 @@ impl Task {
             path: task_path,
             created,
             updated: created,
-            exclude_from_journal: false,
+            exclude_from_journal: None,
+            exclude_from_logging: Some(false),
             remind: None
         }
     }
@@ -149,6 +151,20 @@ impl Task {
             }
 
         Ok(task_list)
+    }
+
+    pub fn is_excluded(&self) -> bool {
+        match &self.exclude_from_journal {
+            Some(x) => if *x { return true },
+            None => ()
+        };
+
+        match &self.exclude_from_logging {
+            Some(x) => if *x { return true },
+            None => ()
+        };
+
+        false
     }
 
     pub fn year_turnover(old_year: &str, new_year: &str) -> Result<()> {
@@ -271,8 +287,11 @@ impl Task {
         Ok(())
     }
 
-    pub fn finish(&self) -> Result<()> {
-        Task::add_comment(&self, "Task Completed", false)?;
+    pub fn finish(&self, comment: &str) -> Result<()> {
+        match Task::add_comment(&self, comment, false) {
+            Ok(_o) => (),
+            Err(_e) => Task::add_comment(&self, comment, true).expect("could not add comment")
+        }
         
         task_list::remove_from_lists(&self.task_name, "none");
 
@@ -294,6 +313,10 @@ impl Task {
     }
 
     pub fn add_comment(&self, comment: &str, is_new: bool) -> Result<()> {
+        if self.is_excluded() {
+            return Ok(());
+        }
+
         let file_path = match is_new {
             false => format!("{}/{}",
                         crate::setting::get_root_folder(),

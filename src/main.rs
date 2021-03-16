@@ -31,7 +31,7 @@ enum Action {
         #[structopt(short = "t", long = "time", default_value = "", help = "HH:MM")]
         time: String,
 
-        #[structopt(short = "n", long = "notice", default_value = "")]
+        #[structopt(short = "n", long = "notice", default_value = "0")]
         notice: u32,
 
         #[structopt(short = "p", long = "project", default_value = "General")]
@@ -40,6 +40,12 @@ enum Action {
     Add {
         task_name: String,
         list_name: String,
+
+        #[structopt(short = "p", long = "project", default_value = "")]
+        project: String,
+    },
+    Cancel {
+        task_name: String,
 
         #[structopt(short = "p", long = "project", default_value = "")]
         project: String,
@@ -147,6 +153,15 @@ fn main() {
             let list = TaskList::get(&list_name);
             list.add(task).expect("could not list task");
         }
+        Action::Cancel {
+            task_name,
+            project
+        } => {
+            let task = Task::get_by_id_or_name(&task_name, false, &project)
+                .expect("could not find task");
+            
+            task.finish("Task Canceled").expect("could not cancel");
+        }
         Action::Finish {
             task_name,
             project
@@ -154,7 +169,7 @@ fn main() {
             let task = Task::get_by_id_or_name(&task_name, false, &project)
                 .expect("could not find task");
             
-            task.finish().expect("could not finish");
+            task.finish("Task Completed").expect("could not finish");
         }
         Action::AddJournal => {
             let journal = Journal::new("Journal", "My Thoughts Today").expect("could not find journal path");
