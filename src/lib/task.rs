@@ -294,6 +294,7 @@ impl Task {
         }
         
         task_list::remove_from_lists(&self.task_name, "none");
+        self.change_task_folder().expect("Could not change task folder");
 
         Ok(())
     }
