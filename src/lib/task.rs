@@ -65,7 +65,7 @@ impl Task {
 
     pub fn get(filepath: &str) -> Result<Task> {
         let p = PathBuf::from(filepath);
-        let newfile = File::open(p)?;
+        let newfile = File::open(p).expect("could not open file");
 
         let mut buf_reader = BufReader::new(newfile);
         let mut contents = String::new();
@@ -214,9 +214,10 @@ impl Task {
         let new_full_path = old_path.replace(&self.task_name, new_name);
         fs::rename(old_path, &new_full_path).expect("could not rename file");
 
-        let mut task = Task::get(&new_full_path).expect("could not load task").clone();
+        let mut task = Task::get_by_id_or_name(&self.task_name, false, "").expect("could not load task").clone();
         task.task_name = new_name.to_string();
         task.path = new_path.to_string();
+
         task.save().expect("could not save renamed task");
 
         Ok(())
@@ -277,6 +278,13 @@ impl Task {
     }
 
     pub fn save(self) -> Result<()> {
+        let is_new = &self.check_is_new()?;
+        let project_root_folder = crate::setting::get_project_folder();
+        let mut project_folder = self.project.to_string();
+        if *is_new {
+            project_folder += "/new";
+        }
+
         let mut task = self;
         if task.id == "" || task.id == "~" {
             task.id = Uuid::new_v4().to_string();
@@ -284,8 +292,7 @@ impl Task {
 
         task.updated = Local::now();
         let ymltask = serde_yaml::to_string(&task).unwrap();
-        let task_path = Task::get_new_folder(&task.path);
-        let file_path = format!("{}/{}.md", task_path, task.task_name);
+        let file_path = format!("{}/{}/{}.md", project_root_folder, project_folder, task.task_name);
 
         if !Path::new(&file_path).exists() {
             return Err(Error::new(ErrorKind::NotFound, "task file not found"));
@@ -450,7 +457,8 @@ impl Task {
     }
 
     fn check_is_new(&self) -> Result<bool> {
-        let new_path = Task::get_new_folder(&self.path);
+        let mut new_path = Task::get_new_folder(&self.path);
+        new_path = format!("{}{}.md", new_path, &self.task_name);
         Ok(Path::new(&new_path).exists()) 
     }
 
