@@ -59,6 +59,13 @@ enum Action {
     List {
         list_name: String,
     },
+    Rename {
+        task_name: String,
+        new_name: String,
+
+        #[structopt(short = "p", long = "project", default_value = "")]
+        project: String,
+    },
     AddJournal, 
     Unlist {
         task_name: String,
@@ -170,6 +177,16 @@ fn main() {
                 .expect("could not find task");
             
             task.finish("Task Completed").expect("could not finish");
+        }
+        Action::Rename {
+            task_name,
+            new_name,
+            project
+        } => {
+            let task = Task::get_by_id_or_name(&task_name, false, &project)
+                .expect("could not find task");
+
+            Task::rename_task(&task, &new_name).expect("could not rename task");
         }
         Action::AddJournal => {
             let journal = Journal::new("Journal", "My Thoughts Today").expect("could not find journal path");
