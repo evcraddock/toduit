@@ -34,7 +34,7 @@ enum Action {
         #[structopt(short = "n", long = "notice", default_value = "0")]
         notice: u32,
 
-        #[structopt(short = "p", long = "project", default_value = "General")]
+        #[structopt(short = "p", long = "project", default_value = "Inbox")]
         project: String,
     },
     Add {

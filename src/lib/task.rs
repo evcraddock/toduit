@@ -185,6 +185,7 @@ impl Task {
                         }
                     }
 
+                    // println!("old path: {}\n newpath: {}\n", f_path, &new_task_path);
                     match fs::rename(f_path, &new_task_path) {
                         Ok(v) => v,
                         Err(e) => eprintln!("could not rename {} with error {}", f_path, e),
@@ -448,11 +449,16 @@ impl Task {
     }
 
     fn get_new_folder(task_path: &str) -> String {
-        let mut entries: Vec<&str> = task_path.split_terminator("/").collect();
+        let root_folder = format!("{}/", &crate::setting::get_root_folder());
+        let ftask_path = &task_path.replace(&root_folder, "");
+        let mut entries: Vec<&str> = ftask_path.split_terminator("/").collect();
+        if ftask_path.contains("/new/") {
+            entries.remove(entries.len() -2);
+        } 
+
+
         entries.remove(entries.len() -1);
-
         let project_path = entries.join("/");
-
         format!("{}/{}/new/", crate::setting::get_root_folder(), project_path)
     }
 
